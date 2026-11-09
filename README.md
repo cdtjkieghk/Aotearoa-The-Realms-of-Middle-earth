@@ -3,18 +3,6 @@
 
 An interactive, Middle-earth-inspired web map of New Zealand. It uses Leaflet for the map interface and Esri World Topographic Map tiles as the default basemap.
 
-## Run locally
-
-Open `index.html` in a modern browser while connected to the internet. The page loads Leaflet from unpkg and map tiles from Esri.
-
-## Publish with GitHub Pages
-
-1. Create or open a GitHub repository.
-2. Upload `index.html` to the repository's root folder.
-3. Open **Settings → Pages**.
-4. Under **Build and deployment**, choose **Deploy from a branch**.
-5. Select your main branch and `/ (root)`, then save.
-6. Open the Pages URL shown by GitHub after deployment.
 
 ## Features
 
