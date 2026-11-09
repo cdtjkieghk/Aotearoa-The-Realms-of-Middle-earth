@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#211b16" />
+  <meta name="description" content="An interactive Middle-earth-inspired atlas of New Zealand: film locations, natural wonders and cities, on an Esri basemap." />
+  <title>Aotearoa — The Realms of Middle-earth</title>
+  <link rel="preconnect" href="https://services.arcgisonline.com" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <style>
+    :root {
+      --ink: #2c2119;
+      --muted-ink: #75624b;
+      --paper: #e9ddc1;
+      --paper-light: #f2e8d1;
+      --paper-dark: #cdbb96;
+      --gold: #a77b3b;
+      --gold-light: #d5b574;
+      --wine: #70432e;
+      --moss: #536447;
+      --sea: #496c73;
+      --shadow: 0 14px 34px rgba(31, 22, 14, .22);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      color: var(--ink);
+      background: #211b16;
+      font-family: Georgia, "Palatino Linotype", "Book Antiqua", serif;
+      overflow: hidden;
+    }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .topbar {
+      height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 0 25px;
+      color: #e9ddc1;
+      background: linear-gradient(105deg, #211a15, #3a2b1d 55%, #211a15);
+      border-bottom: 1px solid rgba(213,181,116,.46);
+      position: relative;
+      z-index: 1000;
+      box-shadow: 0 4px 18px rgba(0,0,0,.22);
+    }
+    .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .brand-mark {
+      width: 42px; height: 42px; flex: 0 0 42px;
+      display: grid; place-items: center;
+      border: 1px solid #a77b3b; border-radius: 50%;
+      color: #d5b574; font-size: 25px;
+      box-shadow: inset 0 0 0 3px rgba(213,181,116,.14);
+    }
+    .brand-overline { color: #bda577; font: 10px/1.3 Arial, sans-serif; letter-spacing: .24em; text-transform: uppercase; }
+    .brand-title { color: #f1e5c8; font-size: 19px; letter-spacing: .09em; text-transform: uppercase; line-height: 1.25; }
+    .topbar-right { display: flex; align-items: center; gap: 18px; color: #cdbb96; font: 10px Arial, sans-serif; letter-spacing: .18em; text-transform: uppercase; }
+    .topbar-right .edition { white-space: nowrap; }
+    .topbar-button {
+      border: 1px solid rgba(213,181,116,.55); border-radius: 2px;
+      background: transparent; color: #e9ddc1; padding: 9px 12px;
+      font: 10px Arial, sans-serif; letter-spacing: .14em; text-transform: uppercase;
+      transition: .2s ease;
+    }
+    .topbar-button:hover { background: rgba(213,181,116,.13); border-color: #d5b574; }
+    #layout { height: calc(100% - 76px); display: grid; grid-template-columns: 350px minmax(0,1fr); }
+    .sidebar {
+      position: relative; z-index: 500; overflow-y: auto;
+      padding: 25px 23px 22px;
+      background:
+        radial-gradient(ellipse at 20% 15%, rgba(255,255,255,.42), transparent 46%),
+        repeating-linear-gradient(0deg, rgba(105,76,42,.025) 0px, rgba(105,76,42,.025) 1px, transparent 1px, transparent 4px),
+        linear-gradient(135deg, #eadfc5, #ddcfad 62%, #e9ddc1);
+      border-right: 1px solid #9c8057;
+      box-shadow: 7px 0 22px rgba(0,0,0,.14);
+    }
+    .sidebar:before { content:""; position:absolute; inset:8px; border:1px solid rgba(119,83,43,.34); pointer-events:none; }
+    .sidebar-inner { position: relative; }
+    .eyebrow { font: 9px Arial, sans-serif; letter-spacing: .2em; color: #8a6a3f; text-transform: uppercase; }
+    h1 { font-size: 30px; line-height: 1.04; font-weight: 500; margin: 11px 0 10px; letter-spacing: -.035em; }
+    h1 em { font-size: 24px; color: #715136; font-weight: 400; }
+    .intro { color: #65533d; font-size: 13px; line-height: 1.58; margin: 0 0 17px; }
+    .rule { height: 1px; background: linear-gradient(90deg, transparent, #a88a5d, transparent); margin: 17px 0; }
+    .stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; margin: 13px 0 18px; }
+    .stat { text-align: center; padding: 9px 4px 8px; border: 1px solid rgba(132,99,55,.32); background: rgba(255,248,228,.26); }
+    .stat strong { display: block; font-size: 21px; font-weight: 500; color: #573c28; }
+    .stat span { display: block; font: 8px Arial, sans-serif; color: #806a4d; letter-spacing: .12em; text-transform: uppercase; margin-top: 3px; }
+    .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+    .section-heading h2 { font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; margin: 0; }
+    .section-heading small { color: #8a7455; font: 9px Arial, sans-serif; letter-spacing: .12em; text-transform: uppercase; }
+    .filters { display: flex; flex-wrap: wrap; gap: 6px; }
+    .filter {
+      padding: 7px 9px; border: 1px solid rgba(120,88,49,.4); border-radius: 20px;
+      background: rgba(255,249,233,.33); color: #6b563a;
+      font: 10px Arial, sans-serif; transition: .18s ease;
+    }
+    .filter:hover { background: rgba(255,249,233,.7); }
+    .filter.active { color: #f2e7cd; background: #60452e; border-color: #60452e; }
+    .filter .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; }
+    .dot.film { background: #a77b3b; } .dot.nature { background: #5d6b4a; } .dot.city { background: #55737a; }
+    .quest-card {
+      position: relative; padding: 14px 14px 13px; margin-top: 18px;
+      background: linear-gradient(140deg, rgba(94,62,38,.96), rgba(59,43,30,.97));
+      color: #eaddc1; border: 1px solid #b18a50; outline: 1px solid rgba(177,138,80,.35); outline-offset: 3px;
+      box-shadow: 0 7px 15px rgba(50,33,19,.18);
+    }
+    .quest-card:after { content: "✦"; position:absolute; top:10px; right:12px; color:#d7b56f; font-size:16px; opacity:.75; }
+    .quest-kicker { font: 9px Arial, sans-serif; letter-spacing: .2em; color: #d3b779; text-transform: uppercase; }
+    .quest-card h3 { font-size: 18px; font-weight: 500; margin: 7px 20px 5px 0; color: #f2e5c7; }
+    .quest-card p { font-size: 11px; line-height: 1.5; color: #d2c1a1; margin: 0 0 12px; }
+    .gold-button, .ghost-button {
+      border: 1px solid #bd9657; padding: 8px 10px; font: 9px Arial,sans-serif;
+      letter-spacing: .13em; text-transform: uppercase; transition: .2s ease;
+    }
+    .gold-button { background: #b18a50; color: #241a12; }
+    .gold-button:hover { background: #d1ad6e; }
+    .ghost-button { background: transparent; color: #eadcc0; border-color: rgba(213,181,116,.5); }
+    .ghost-button:hover { background: rgba(213,181,116,.12); }
+    .quest-actions { display:flex; gap:7px; flex-wrap:wrap; }
+    .tools-row { display: flex; gap: 7px; margin-top: 14px; }
+    .tool-button { flex:1; background: rgba(255,249,233,.36); color:#58442e; border:1px solid rgba(120,88,49,.42); padding:9px 7px; font:9px Arial,sans-serif; letter-spacing:.1em; text-transform:uppercase; }
+    .tool-button:hover, .tool-button.active { background:#665039; color:#f2e7cd; border-color:#665039; }
+    .tool-button .symbol { font-size: 14px; display:block; margin-bottom:3px; }
+    .measure-note { display:none; margin-top:9px; padding:9px 10px; background:rgba(255,248,226,.6); border-left:3px solid #a77b3b; color:#60482e; font:11px/1.45 Arial,sans-serif; }
+    .measure-note.show { display:block; }
+    .saved-list { margin: 8px 0 0; padding: 0; list-style: none; }
+    .saved-list li { display:flex; justify-content:space-between; gap:8px; padding:6px 0; border-bottom:1px dashed rgba(120,88,49,.28); font-size:11px; color:#5e4b35; }
+    .saved-list button { border:0; background:transparent; color:#8b5d35; font-size:12px; padding:0 3px; }
+    .saved-empty { color:#927d5e; font-size:11px; font-style:italic; margin:7px 0 0; }
+    .sidebar-foot { color:#8b785b; font:9px/1.45 Arial,sans-serif; margin-top:19px; text-align:center; letter-spacing:.04em; }
+    .map-wrap { position:relative; min-width:0; min-height:0; background:#a9b1a2; }
+    #map { height:100%; width:100%; background:#c9c1a9; }
+    #map:after {
+      content:""; position:absolute; inset:0; z-index:400; pointer-events:none;
+      background:rgba(195,164,112,.15); mix-blend-mode:multiply;
+      box-shadow: inset 0 0 90px rgba(77,53,29,.28), inset 0 0 0 9px rgba(229,213,179,.58), inset 0 0 0 11px rgba(103,75,42,.45);
+    }
+    .leaflet-tile { filter: sepia(.26) saturate(.73) contrast(.94) brightness(1.03); }
+    .leaflet-control-attribution { font: 9px Arial,sans-serif !important; background:rgba(242,232,209,.82) !important; color:#594832 !important; }
+    .leaflet-control-attribution a { color:#57442d !important; }
+    .leaflet-control-zoom a { color:#493725 !important; background:#eee2c5 !important; border-color:#a68a60 !important; }
+    .leaflet-control-scale-line { border-color:#58432d !important; color:#493725 !important; background:rgba(242,232,209,.75) !important; font:9px Arial,sans-serif !important; }
+    .map-top-controls { position:absolute; top:16px; right:24px; z-index:700; display:flex; gap:7px; align-items:center; }
+    .map-control {
+      color:#eadfc3; background:rgba(43,32,22,.88); border:1px solid rgba(213,181,116,.7);
+      padding:10px 12px; box-shadow:0 4px 12px rgba(0,0,0,.17); font:9px Arial,sans-serif; letter-spacing:.13em; text-transform:uppercase;
+    }
+    .map-control:hover { background:#694a2c; }
+    .map-control select { color:#eadfc3; background:transparent; border:0; outline:0; font:9px Arial,sans-serif; letter-spacing:.1em; text-transform:uppercase; cursor:pointer; }
+    .map-control select option { color:#31251a; }
+    .compass {
+      position:absolute; z-index:650; right:27px; bottom:40px; width:104px; height:104px;
+      opacity:.79; pointer-events:none; filter:drop-shadow(0 2px 3px rgba(0,0,0,.25));
+    }
+    .map-stamp {
+      position:absolute; z-index:650; bottom:20px; left:20px; padding:8px 11px;
+      color:#59442d; background:rgba(239,226,197,.85); border:1px solid rgba(113,81,43,.5);
+      font:9px/1.45 Arial,sans-serif; letter-spacing:.12em; text-transform:uppercase; pointer-events:none;
+    }
+    .island-label { color:#59432b; font:italic 15px Georgia,serif; letter-spacing:.16em; text-transform:uppercase; white-space:nowrap; text-shadow:0 1px 0 rgba(245,235,211,.9), 1px 0 0 rgba(245,235,211,.7), -1px 0 0 rgba(245,235,211,.7); opacity:.83; }
+    .pin-wrap { background:transparent; border:0; }
+    .pin {
+      position:relative; width:28px; height:28px; display:grid; place-items:center;
+      border:1.5px solid #f1dfb7; border-radius:50% 50% 50% 4px; transform:rotate(-45deg);
+      box-shadow:0 2px 7px rgba(34,24,15,.55); color:#fff0d0;
+    }
+    .pin span { transform:rotate(45deg); font:14px Georgia,serif; line-height:1; }
+    .pin.film { background:#8a5b2e; outline:1px solid #694527; }
+    .pin.nature { background:#536747; outline:1px solid #35482f; }
+    .pin.city { background:#456872; outline:1px solid #294d55; }
+    .pin.selected { box-shadow:0 0 0 5px rgba(213,181,116,.4),0 2px 8px rgba(34,24,15,.65); }
+    .popup-card { min-width:215px; max-width:260px; color:#37281b; font-family:Georgia,serif; }
+    .popup-kicker { color:#8c693b; font:9px Arial,sans-serif; letter-spacing:.18em; text-transform:uppercase; margin-bottom:4px; }
+    .popup-card h3 { font-size:18px; font-weight:500; margin:0 0 3px; color:#3c2a1a; }
+    .popup-card h4 { margin:0 0 8px; color:#7a6041; font-size:12px; font-style:italic; font-weight:400; }
+    .popup-card p { font-size:11px; line-height:1.5; margin:0 0 9px; color:#5d4b37; }
+    .popup-meta { padding-top:6px; border-top:1px solid #d7c6a3; color:#8a775b; font:9px Arial,sans-serif; letter-spacing:.05em; }
+    .popup-add { margin-top:9px; background:#715033; color:#f0e2c2; border:1px solid #9d7748; padding:7px 9px; width:100%; font:9px Arial,sans-serif; text-transform:uppercase; letter-spacing:.1em; }
+    .popup-add:hover { background:#9c7040; }
+    .leaflet-popup-content-wrapper { border:1px solid #9d8053; border-radius:2px; background:#efe4ca; box-shadow:0 7px 22px rgba(34,25,15,.32); }
+    .leaflet-popup-tip { background:#efe4ca; }
+    .leaflet-popup-content { margin:13px 15px; }
+    .leaflet-container a.leaflet-popup-close-button { color:#7a6041; }
+    .leaflet-tooltip.trail-label { background:rgba(57,41,27,.9); color:#e6d5ae; border:1px solid #b58b4d; border-radius:2px; font:9px Arial,sans-serif; letter-spacing:.12em; text-transform:uppercase; box-shadow:none; }
+    .leaflet-tooltip.trail-label:before { display:none; }
+    .about-overlay { display:none; position:absolute; z-index:1200; inset:0; background:rgba(24,19,15,.58); align-items:center; justify-content:center; padding:18px; }
+    .about-overlay.open { display:flex; }
+    .about-card { position:relative; width:min(480px,100%); padding:27px; background:#e9ddc1; border:2px solid #93734b; box-shadow:0 15px 55px rgba(0,0,0,.4); }
+    .about-card:before { content:""; position:absolute; inset:7px; border:1px solid rgba(119,83,43,.4); pointer-events:none; }
+    .about-card h2 { position:relative; font-size:24px; font-weight:500; margin:0 0 12px; }
+    .about-card p { position:relative; font-size:13px; line-height:1.6; color:#5e4c37; }
+    .about-card .close { position:absolute; right:16px; top:12px; z-index:2; border:0; background:transparent; color:#674b2f; font-size:24px; }
+    .about-card a { color:#72512e; }
+    .measure-cursor { cursor:crosshair !important; }
+    .toast { position:absolute; left:50%; bottom:24px; z-index:900; transform:translate(-50%,15px); opacity:0; pointer-events:none; transition:.25s ease; padding:9px 13px; border:1px solid #b99458; background:rgba(47,34,23,.94); color:#f0e4c8; font:11px Arial,sans-serif; box-shadow:0 5px 15px rgba(0,0,0,.25); }
+    .toast.show { opacity:1; transform:translate(-50%,0); }
+    @media (max-width: 880px) {
+      #layout { grid-template-columns:300px minmax(0,1fr); }
+      .sidebar { padding:20px 17px; }
+      h1 { font-size:27px; }
+      .topbar { padding:0 16px; }
+    }
+    @media (max-width: 680px) {
+      body { overflow:auto; }
+      .topbar { height:66px; padding:0 12px; }
+      .brand-mark { width:36px;height:36px;flex-basis:36px;font-size:21px; }
+      .brand-title { font-size:14px; }
+      .brand-overline { font-size:8px; }
+      .topbar-right .edition { display:none; }
+      .topbar-button { padding:8px; font-size:8px; }
+      #layout { height:auto; min-height:calc(100% - 66px); display:flex; flex-direction:column; }
+      .sidebar { order:2; overflow:visible; border-right:0; border-top:1px solid #9c8057; }
+      .map-wrap { order:1; height:64vh; min-height:430px; }
+      .map-top-controls { top:11px; right:11px; }
+      .map-control { padding:8px 9px; font-size:8px; }
+      .compass { width:75px;height:75px;right:15px;bottom:28px; }
+      .map-stamp { left:11px; bottom:12px; font-size:8px; }
+      .sidebar:before { inset:6px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">✧</div>
+      <div>
+        <div class="brand-overline">The cartographer's field guide</div>
+        <div class="brand-title">The Realms of Aotearoa</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span class="edition">An illustrated atlas · Vol. I</span>
+      <button class="topbar-button" id="aboutBtn">About this map</button>
+    </div>
+  </header>
+
+  <main id="layout">
+    <aside class="sidebar">
+      <div class="sidebar-inner">
+        <div class="eyebrow">A Middle-earth-inspired field atlas</div>
+        <h1>Aotearoa,<br><em>the Shire of the South</em></h1>
+        <p class="intro">A little journey across New Zealand's landscapes: from the green hills of the Shire to the volcanic slopes of Mordor. Explore real places, film locations and a few cartographer's curiosities.</p>
+
+        <div class="stats">
+          <div class="stat"><strong>2</strong><span>Main islands</span></div>
+          <div class="stat"><strong id="placeCount">25</strong><span>Places to find</span></div>
+          <div class="stat"><strong>1</strong><span>Epic quest</span></div>
+        </div>
+
+        <div class="section-heading"><h2>Choose your realm</h2><small id="visibleCount">25 shown</small></div>
+        <div class="filters" id="filters">
+          <button class="filter active" data-filter="all">All places</button>
+          <button class="filter" data-filter="film"><i class="dot film"></i>Film locations</button>
+          <button class="filter" data-filter="nature"><i class="dot nature"></i>Wild places</button>
+          <button class="filter" data-filter="city"><i class="dot city"></i>Settlements</button>
+        </div>
+
+        <div class="quest-card">
+          <div class="quest-kicker">Your next quest</div>
+          <h3 id="questTitle">The road goes ever on</h3>
+          <p id="questText">Pick a destination and see where the map takes you. There are filming locations and natural wonders hidden across both islands.</p>
+          <div class="quest-actions">
+            <button class="gold-button" id="randomQuest">✦ Find me a quest</button>
+            <button class="ghost-button" id="trailButton">Trace the Fellowship</button>
+          </div>
+        </div>
+
+        <div class="tools-row">
+          <button class="tool-button" id="measureButton"><span class="symbol">⌁</span>Measure distance</button>
+          <button class="tool-button" id="clearButton"><span class="symbol">⟲</span>Clear map</button>
+        </div>
+        <div class="measure-note" id="measureNote">Choose two map markers to measure the straight-line distance. This is not a road or ferry distance. <strong id="measureResult"></strong></div>
+
+        <div class="rule"></div>
+        <div class="section-heading"><h2>Adventurer's notebook</h2><small id="savedCount">0 saved</small></div>
+        <ul class="saved-list" id="savedList"></ul>
+        <p class="saved-empty" id="savedEmpty">Save places from their map pop-ups and they will appear here.</p>
+        <div class="sidebar-foot">Not all those who wander are lost.<br>But do keep an eye on the scale bar.</div>
+      </div>
+    </aside>
+
+    <section class="map-wrap">
+      <div id="map" aria-label="Interactive map of New Zealand"></div>
+      <div class="map-top-controls">
+        <div class="map-control">Basemap&nbsp;
+          <select id="basemapSelect" aria-label="Choose basemap">
+            <option value="topo">Esri Topographic</option>
+            <option value="imagery">Esri Imagery</option>
+          </select>
+        </div>
+        <button class="map-control" id="fitButton">⌖ &nbsp;Whole realm</button>
+      </div>
+      <svg class="compass" viewBox="0 0 120 120" aria-hidden="true">
+        <circle cx="60" cy="60" r="53" fill="rgba(238,224,194,.55)" stroke="#4d3925" stroke-width="2"/>
+        <circle cx="60" cy="60" r="46" fill="none" stroke="#4d3925" stroke-width="1"/>
+        <path d="M60 8 L66 53 L112 60 L66 67 L60 112 L54 67 L8 60 L54 53 Z" fill="#755333" stroke="#3d2c1c" stroke-width="1.3"/>
+        <path d="M60 15 L63 57 L105 60 L63 63 L60 105 L57 63 L15 60 L57 57 Z" fill="#e8d9b8" stroke="#4d3925" stroke-width="1"/>
+        <path d="M60 25 L68 60 L60 95 L52 60 Z M25 60 L60 52 L95 60 L60 68 Z" fill="#6b4b2d" stroke="#3d2c1c" stroke-width="1"/>
+        <circle cx="60" cy="60" r="9" fill="#d8bd82" stroke="#3d2c1c" stroke-width="1.5"/>
+        <circle cx="60" cy="60" r="3" fill="#3d2c1c"/>
+        <g fill="#3b2a1a" font-family="Georgia,serif" font-size="9" text-anchor="middle"><text x="60" y="7">N</text><text x="60" y="119">S</text><text x="114" y="63">E</text><text x="6" y="63">W</text></g>
+      </svg>
+      <div class="map-stamp">Aotearoa · New Zealand<br>34°–47° S &nbsp; / &nbsp; 166°–179° E</div>
+      <div class="toast" id="toast" role="status"></div>
+      <div class="about-overlay" id="aboutOverlay">
+        <div class="about-card">
+          <button class="close" id="closeAbout" aria-label="Close">×</button>
+          <h2>A note from the mapmaker</h2>
+          <p>This is a fan-made, Middle-earth-inspired map of real places in Aotearoa New Zealand. The fantasy names are playful references; the pins mark actual towns, landscapes and well-known filming locations.</p>
+          <p>The basemap is Esri World Topographic Map, with Esri attribution retained in the map corner. Switch to Esri World Imagery to see the landscape beneath the parchment tint.</p>
+          <p>Distance measurements are straight-line distances, not driving directions. The Fellowship trail is an illustrative sequence, not a navigable route. Please check access, weather and local conservation guidance before visiting remote places.</p>
+          <p><strong>Not affiliated with Middle-earth Enterprises, Tolkien Estate, New Line Cinema or Warner Bros.</strong></p>
+          <p><a href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank" rel="noopener">Esri terms of use</a> · <a href="https://www.arcgis.com/home/item.html?id=6e850093c837475e8c23d905ac43b7d0" target="_blank" rel="noopener">Esri World Topographic Map</a></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    // Coordinates are intentionally approximate for an exploratory map, not turn-by-turn navigation.
+    const places = [
+      {id:'auckland',name:'Auckland',alias:'The great harbour city',category:'city',coords:[-36.8485,174.7633],icon:'⌂',description:'New Zealand’s largest city stretches across a remarkable volcanic landscape between two harbours. A good starting point for any northern expedition.'},
+      {id:'hamilton',name:'Hamilton',alias:'The Waikato crossing',category:'city',coords:[-37.7870,175.2793],icon:'⌂',description:'A lively inland city beside the Waikato River, close to the green farmland and rolling hills of the central North Island.'},
+      {id:'tauranga',name:'Tauranga',alias:'The Bay of Plenty',category:'city',coords:[-37.6878,176.1651],icon:'⌂',description:'A coastal city watched over by Mauao, with beaches, a busy harbour and easy access to the eastern Bay of Plenty.'},
+      {id:'rotorua',name:'Rotorua',alias:'The land of steam and fire',category:'city',coords:[-38.1368,176.2497],icon:'⌂',description:'A geothermal region of bubbling mud, hot springs and strong Māori cultural heritage. The earth is very much alive here.'},
+      {id:'napier',name:'Napier',alias:'The Art Deco coast',category:'city',coords:[-39.4928,176.9120],icon:'⌂',description:'A sunny Hawke’s Bay coastal city known for its Art Deco architecture, wineries and long Pacific views.'},
+      {id:'palmerston',name:'Palmerston North',alias:'The Manawatū waystation',category:'city',coords:[-40.3523,175.6082],icon:'⌂',description:'A university and service city on the Manawatū Plains, with the Tararua Range rising to the east.'},
+      {id:'wellington',name:'Wellington',alias:'The gateway to the south',category:'city',coords:[-41.2865,174.7762],icon:'⌂',description:'The capital sits around a dramatic harbour at the foot of steep green hills. It is also home to Wētā Workshop and a major part of New Zealand’s screen industry.'},
+      {id:'nelson',name:'Nelson',alias:'The sunlit north',category:'city',coords:[-41.2706,173.2840],icon:'⌂',description:'A creative coastal city near Abel Tasman National Park, golden beaches and the clear waters of Tasman Bay.'},
+      {id:'christchurch',name:'Christchurch',alias:'The Canterbury gateway',category:'city',coords:[-43.5321,172.6362],icon:'⌂',description:'The largest South Island city, with a compact centre, the Port Hills and the Canterbury Plains at its doorstep.'},
+      {id:'queenstown',name:'Queenstown',alias:'The adventure capital',category:'city',coords:[-45.0312,168.6626],icon:'⌂',description:'A lakeside town surrounded by the Remarkables and other dramatic ranges. A natural base for exploring the southern film landscapes.'},
+      {id:'dunedin',name:'Dunedin',alias:'The southern scholar',category:'city',coords:[-45.8788,170.5028],icon:'⌂',description:'A historic university city with Victorian architecture, a rugged peninsula and wildlife-rich coastlines.'},
+      {id:'invercargill',name:'Invercargill',alias:'The far south',category:'city',coords:[-46.4132,168.3538],icon:'⌂',description:'One of the southernmost cities in the country and a gateway to Southland, Stewart Island and the Catlins.'},
+
+      {id:'hobbiton',name:'Hobbiton Movie Set',alias:'The Shire',category:'film',coords:[-37.8721,175.6829],icon:'✿',description:'The rolling green farmland near Matamata became the home of the hobbits on screen. The permanent movie set can be visited on a guided tour.'},
+      {id:'tongariro',name:'Mount Ngauruhoe',alias:'Mount Doom · Mordor',category:'film',coords:[-39.1570,175.6320],icon:'▲',description:'This striking volcanic cone stood in for Mount Doom. It lies within Tongariro National Park, a dual World Heritage area. The summit is culturally significant and is not a normal hiking destination.'},
+      {id:'kaitoke',name:'Kaitoke Regional Park',alias:'Rivendell',category:'film',coords:[-41.0735,175.1370],icon:'✧',description:'The forested Hutt River valley provided the setting for Rivendell. Today it is a real regional park with walking tracks and picnic areas.'},
+      {id:'putangirua',name:'Pūtangirua Pinnacles',alias:'The Paths of the Dead',category:'film',coords:[-41.4350,175.2260],icon:'♜',description:'A dramatic badlands landscape of eroded pillars appeared in the Paths of the Dead sequence. The pinnacles are reached by a walking track; conditions can change after heavy rain.'},
+      {id:'mount-sunday',name:'Mount Sunday',alias:'Edoras · Rohan',category:'film',coords:[-43.5057,170.8992],icon:'♜',description:'A lonely hill in the Hakatere Conservation Park became the location of Edoras. The surrounding Canterbury high country makes the journey part of the experience.'},
+      {id:'paradise',name:'Paradise, Glenorchy',alias:'Isengard & Lothlórien landscapes',category:'film',coords:[-44.8190,168.3830],icon:'✧',description:'The beech forests and mountain scenery around Glenorchy featured in several Middle-earth scenes, including landscapes associated with Isengard and Lothlórien.'},
+      {id:'mavora',name:'Mavora Lakes',alias:'The wild lands of Rohan',category:'film',coords:[-45.2860,168.1300],icon:'♜',description:'Remote lakes, tussock country and mountain backdrops appeared in several film sequences. This is a quiet, rugged area: check road and weather conditions before setting out.'},
+
+      {id:'abel-tasman',name:'Abel Tasman National Park',alias:'The golden coast',category:'nature',coords:[-40.8500,172.9000],icon:'❋',description:'A coastal world of golden beaches, clear water and forested headlands. The Abel Tasman Coast Track is one of New Zealand’s Great Walks.'},
+      {id:'waitomo',name:'Waitomo Caves',alias:'The underground kingdom',category:'nature',coords:[-38.2600,175.1050],icon:'✧',description:'A limestone cave system famous for glowworms and underground rivers. Guided visits reveal a very different side of the Waikato landscape.'},
+      {id:'aoraki',name:'Aoraki / Mount Cook',alias:'The high peaks',category:'nature',coords:[-43.5950,170.1410],icon:'▲',description:'New Zealand’s highest mountain rises above the Southern Alps. The national park has alpine walks, glaciers and exceptional dark-sky conditions.'},
+      {id:'pukaki',name:'Lake Pūkaki',alias:'The turquoise mirror',category:'nature',coords:[-44.1720,170.1410],icon:'❋',description:'A glacial lake famous for its intense milky-blue colour and open views towards Aoraki / Mount Cook.'},
+      {id:'milford',name:'Milford Sound / Piopiotahi',alias:'The fjord at the end of the road',category:'nature',coords:[-44.6710,167.9250],icon:'❋',description:'A spectacular fiord of steep cliffs, waterfalls and dark water in Fiordland National Park. Rain often makes the waterfalls even more impressive.'},
+      {id:'franz-josef',name:'Westland Tai Poutini',alias:'The glacier country',category:'nature',coords:[-43.4640,170.1820],icon:'▲',description:'The West Coast is a land of rainforest, ice and steep mountains. Glacier access changes with conditions; use current DOC and operator guidance.'}
+    ];
+
+    const esriAttribution = 'Tiles & data: <a href="https://www.esri.com/" target="_blank" rel="noopener">Esri</a>, DeLorme, HERE, Garmin, Intermap, increment P Corp., GEBCO, USGS, FAO, NPS, NRCAN, GeoBase, IGN, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), swisstopo, MapmyIndia, <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> and the GIS User Community';
+    const topo = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, attribution:esriAttribution});
+    const imagery = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, attribution:'Imagery: Sources: <a href="https://www.esri.com/" target="_blank" rel="noopener">Esri</a>, Maxar, Earthstar Geographics, and the GIS User Community'});
+    const map = L.map('map', {zoomControl:false, minZoom:4, maxZoom:16, preferCanvas:true, zoomSnap:.25}).setView([-41.4,172.6],5.25);
+    topo.addTo(map);
+    L.control.zoom({position:'bottomright'}).addTo(map);
+    L.control.scale({position:'bottomleft',imperial:false,maxWidth:120}).addTo(map);
+    const nzBounds = L.latLngBounds([[-47.5,165.5],[-33.5,179.8]]);
+    const markers = {};
+    const markerLayer = L.layerGroup().addTo(map);
+    const trailLayer = L.layerGroup().addTo(map);
+    let activeFilter = 'all';
+    let measureMode = false;
+    let measurePoints = [];
+    let measureLine = null;
+    let saved = [];
+    let toastTimer;
+
+    function escapeHtml(value) { return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function iconFor(place, selected=false) {
+      return L.divIcon({className:'pin-wrap',html:`<div class="pin ${place.category}${selected?' selected':''}"><span>${place.icon}</span></div>`,iconSize:[30,35],iconAnchor:[15,30],popupAnchor:[0,-25]});
+    }
+    function popupHTML(p) {
+      return `<div class="popup-card"><div class="popup-kicker">${p.category==='film'?'ON THE FILM TRAIL':p.category==='nature'?'WILD PLACE':'SETTLEMENT'}</div><h3>${escapeHtml(p.name)}</h3><h4>${escapeHtml(p.alias)}</h4><p>${escapeHtml(p.description)}</p><div class="popup-meta">${p.coords[0].toFixed(3)}° S &nbsp;·&nbsp; ${p.coords[1].toFixed(3)}° E</div><button class="popup-add" data-save="${p.id}">✦ Add to adventurer's notebook</button></div>`;
+    }
+    function showToast(message) {
+      const el=document.getElementById('toast'); el.textContent=message; el.classList.add('show');
+      clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),2300);
+    }
+    function visiblePlaces() { return activeFilter==='all'?places:places.filter(p=>p.category===activeFilter); }
+    function updateVisibleCount() { document.getElementById('visibleCount').textContent=`${visiblePlaces().length} shown`; }
+    function addMarker(p) {
+      const m=L.marker(p.coords,{icon:iconFor(p),title:p.name,keyboard:true,alt:p.name});
+      m.bindPopup(popupHTML(p),{maxWidth:280,closeButton:true});
+      m.on('click',()=>{
+        if(measureMode) { chooseMeasurePoint(p); m.closePopup(); }
+      });
+      m.on('popupopen',()=>{
+        const button=document.querySelector(`[data-save="${p.id}"]`);
+        if(button) button.addEventListener('click',()=>savePlace(p.id));
+      });
+      markers[p.id]=m;
+      return m;
+    }
+    places.forEach(addMarker);
+    function renderMarkers() {
+      markerLayer.clearLayers();
+      visiblePlaces().forEach(p=>markers[p.id].addTo(markerLayer));
+      updateVisibleCount();
+    }
+    renderMarkers();
+
+    // Island labels are separate, lightweight map annotations.
+    const islandIcon=(text)=>L.divIcon({className:'',html:`<div class="island-label">${text}</div>`,iconSize:[170,24],iconAnchor:[85,12]});
+    L.marker([-39.35,175.05],{icon:islandIcon('Te Ika-a-Māui'),interactive:false}).addTo(map);
+    L.marker([-43.55,169.6],{icon:islandIcon('Te Waipounamu'),interactive:false}).addTo(map);
+
+    document.getElementById('filters').addEventListener('click',e=>{
+      const btn=e.target.closest('[data-filter]'); if(!btn) return;
+      activeFilter=btn.dataset.filter;
+      document.querySelectorAll('.filter').forEach(b=>b.classList.toggle('active',b===btn));
+      renderMarkers();
+    });
+
+    document.getElementById('basemapSelect').addEventListener('change',e=>{
+      if(e.target.value==='imagery') { map.removeLayer(topo); imagery.addTo(map); }
+      else { map.removeLayer(imagery); topo.addTo(map); }
+    });
+
+    const trailNorth=[[-37.8721,175.6829],[-39.1570,175.6320],[-41.0735,175.1370]];
+    const trailSouth=[[-43.5057,170.8992],[-44.8190,168.3830],[-45.2860,168.1300]];
+    const ferryLine=[[-41.2865,174.7762],[-41.1,174.0],[-41.05,173.95],[-41.2,174.0]];
+    let trailOn=false;
+    function toggleTrail() {
+      trailOn=!trailOn;
+      trailLayer.clearLayers();
+      const btn=document.getElementById('trailButton');
+      btn.textContent=trailOn?'Hide the trail':'Trace the Fellowship';
+      if(trailOn) {
+        L.polyline(trailNorth,{color:'#70432e',weight:4,opacity:.85,dashArray:'7 9',lineCap:'round'}).addTo(trailLayer).bindTooltip('The North Island chapter',{sticky:true,className:'trail-label'});
+        L.polyline(trailSouth,{color:'#70432e',weight:4,opacity:.85,dashArray:'7 9',lineCap:'round'}).addTo(trailLayer).bindTooltip('The South Island chapter',{sticky:true,className:'trail-label'});
+        L.polyline(ferryLine,{color:'#a77b3b',weight:2,opacity:.9,dashArray:'2 7'}).addTo(trailLayer).bindTooltip('Cook Strait · illustrative crossing',{sticky:true,className:'trail-label'});
+        map.fitBounds(L.latLngBounds([...trailNorth,...trailSouth]),{padding:[45,45]});
+        showToast('The Fellowship trail is revealed — a story sequence, not a road route.');
+      }
+    }
+    document.getElementById('trailButton').addEventListener('click',toggleTrail);
+
+    function chooseRandomQuest() {
+      const candidates=places.filter(p=>p.category!=='city');
+      const p=candidates[Math.floor(Math.random()*candidates.length)];
+      activeFilter='all'; document.querySelectorAll('.filter').forEach(b=>b.classList.toggle('active',b.dataset.filter==='all'));
+      renderMarkers();
+      map.flyTo(p.coords,Math.max(map.getZoom(),7),{duration:1.1});
+      setTimeout(()=>markers[p.id].openPopup(),850);
+      document.getElementById('questTitle').textContent=p.name;
+      document.getElementById('questText').textContent=`Your map has chosen ${p.alias}. ${p.description}`;
+      showToast('A new quest awaits. The map has marked your destination.');
+    }
+    document.getElementById('randomQuest').addEventListener('click',chooseRandomQuest);
+
+    function savePlace(id) {
+      const p=places.find(x=>x.id===id); if(!p) return;
+      if(saved.includes(id)) { showToast(`${p.name} is already in your notebook.`); return; }
+      saved.push(id); renderSaved(); showToast(`${p.name} added to your notebook.`);
+    }
+    function removeSaved(id) { saved=saved.filter(x=>x!==id); renderSaved(); }
+    function renderSaved() {
+      const list=document.getElementById('savedList'); list.innerHTML='';
+      saved.forEach(id=>{
+        const p=places.find(x=>x.id===id); if(!p) return;
+        const li=document.createElement('li');
+        const name=document.createElement('span'); name.textContent=p.name;
+        const actions=document.createElement('span');
+        const go=document.createElement('button'); go.textContent='↗'; go.title='Show on map'; go.addEventListener('click',()=>{map.flyTo(p.coords,8,{duration:.8});markers[id].openPopup();});
+        const del=document.createElement('button'); del.textContent='×'; del.title='Remove'; del.addEventListener('click',()=>removeSaved(id));
+        actions.append(go,del); li.append(name,actions); list.append(li);
+      });
+      document.getElementById('savedCount').textContent=`${saved.length} saved`;
+      document.getElementById('savedEmpty').style.display=saved.length?'none':'block';
+    }
+
+    function setMeasureMode(on) {
+      measureMode=on; measurePoints=[];
+      document.getElementById('measureButton').classList.toggle('active',on);
+      document.getElementById('measureNote').classList.toggle('show',on);
+      document.getElementById('measureResult').textContent='';
+      document.getElementById('map').classList.toggle('measure-cursor',on);
+      if(measureLine) { map.removeLayer(measureLine); measureLine=null; }
+      showToast(on?'Distance tool active: select two place markers.':'Distance tool closed.');
+    }
+    function chooseMeasurePoint(p) {
+      if(!measureMode) return;
+      if(measurePoints.length===2) { measurePoints=[]; if(measureLine) map.removeLayer(measureLine); measureLine=null; }
+      measurePoints.push(p);
+      if(measurePoints.length===1) {
+        document.getElementById('measureResult').textContent=` First point: ${p.name}. Choose one more.`;
+      } else {
+        const a=L.latLng(measurePoints[0].coords), b=L.latLng(measurePoints[1].coords);
+        const km=map.distance(a,b)/1000;
+        measureLine=L.polyline([a,b],{color:'#7b3f27',weight:3,dashArray:'5 7',opacity:.9}).addTo(map);
+        document.getElementById('measureResult').textContent=` ${measurePoints[0].name} → ${measurePoints[1].name}: ${Math.round(km).toLocaleString()} km (straight line).`;
+        showToast(`${Math.round(km).toLocaleString()} km as the crow flies.`);
+      }
+    }
+    document.getElementById('measureButton').addEventListener('click',()=>setMeasureMode(!measureMode));
+    document.getElementById('clearButton').addEventListener('click',()=>{
+      if(trailOn) toggleTrail();
+      if(measureMode) setMeasureMode(false);
+      if(measureLine) {map.removeLayer(measureLine);measureLine=null;}
+      document.getElementById('measureResult').textContent='';
+      map.closePopup(); map.fitBounds(nzBounds,{padding:[25,25]});
+      showToast('The map is clear. Your saved places remain in the notebook.');
+    });
+    document.getElementById('fitButton').addEventListener('click',()=>map.fitBounds(nzBounds,{padding:[25,25]}));
+
+    const about=document.getElementById('aboutOverlay');
+    document.getElementById('aboutBtn').addEventListener('click',()=>about.classList.add('open'));
+    document.getElementById('closeAbout').addEventListener('click',()=>about.classList.remove('open'));
+    about.addEventListener('click',e=>{if(e.target===about) about.classList.remove('open');});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape') about.classList.remove('open');});
+
+    // On wider screens, show both islands in the initial extent; on phones the map remains easy to pan.
+    map.fitBounds(nzBounds,{padding:[28,28]});
+    setTimeout(()=>map.invalidateSize(),250);
+    window.addEventListener('resize',()=>map.invalidateSize());
+  </script>
+</body>
+</html>
